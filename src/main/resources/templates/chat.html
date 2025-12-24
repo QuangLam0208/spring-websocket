@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hỗ trợ khách hàng</title>
+    <style>
+        #chat-page { display: none; }
+    </style>
+</head>
+<body>
+    <div id="username-page">
+        <h2>Nhập tên để chat</h2>
+        <input type="text" id="name" placeholder="Tên của bạn..." />
+        <button onclick="connect()">Vào chat</button>
+    </div>
+
+    <div id="chat-page">
+        <h2>Chat Support</h2>
+        <ul id="messageArea"></ul>
+        <input type="text" id="message" placeholder="Nhập tin nhắn..." />
+        <button onclick="send()">Gửi</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script>
+        var stompClient = null;
+        var username = null;
+
+        function connect() {
+            username = document.querySelector('#name').value.trim();
+            if(username) {
+                document.querySelector('#username-page').style.display = 'none';
+                document.querySelector('#chat-page').style.display = 'block';
+
+                var socket = new SockJS('/ws');
+                stompClient = Stomp.over(socket);
+                stompClient.connect({}, onConnected, onError);
+            }
+        }
+
+        function onConnected() {
+            // Subscribe vào topic public
+            stompClient.subscribe('/topic/public', onMessageReceived);
+            // Gửi thông báo join
+            stompClient.send("/app/chat.addUser", {}, JSON.stringify({sender: username, type: 'JOIN'}));
+        }
+
+        function onError(error) {
+            alert('Không thể kết nối đến server!');
+        }
+
+        function send() {
+            var messageContent = document.querySelector('#message').value.trim();
+            if(messageContent && stompClient) {
+                var chatMessage = {
+                    sender: username,
+                    content: messageContent,
+                    type: 'CHAT'
+                };
+                stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+                document.querySelector('#message').value = '';
+            }
+        }
+
+        function onMessageReceived(payload) {
+            var message = JSON.parse(payload.body);
+            var messageElement = document.createElement('li');
+            messageElement.innerText = message.sender + ": " + message.content;
+            document.querySelector('#messageArea').appendChild(messageElement);
+        }
+    </script>
+</body>
+</html>
